@@ -69,6 +69,7 @@ module Lang.Crucible.CFG.Core
   , stmtSeqTermStmt
   , Stmt(..)
   , ppStmt
+  , ppStmtExt
   , nextStmtHeight
 
   , applyEmbeddingStmt
@@ -78,7 +79,9 @@ module Lang.Crucible.CFG.Core
 
     -- * Expressions
   , Expr(..)
+  , ppExpr
   , Reg(..)
+  , ppReg
   , extendReg
   , lastReg
 
@@ -98,6 +101,7 @@ import Data.Parameterized.Some
 import Data.Parameterized.TraversableFC
 import Data.String
 import Text.PrettyPrint.ANSI.Leijen hiding ((<$>))
+import Data.Proxy
 
 import What4.ProgramLoc
 import What4.Symbol
@@ -569,11 +573,22 @@ nextStmtHeight h s =
     Assert{} -> h
     Assume{} -> h
 
-ppStmt :: PrettyExt ext => Size ctx -> Stmt ext ctx ctx' -> Doc
+ppExpr :: PrettyExt ext => Expr ext ctx tp -> Doc
+ppExpr = pretty
+
+-- | Pretty printer for 'StmtExtension'.
+--
+-- The proxy is necessary because 'StmtExtension' is type family and
+-- so without the proxy @ext@ is ambiguous.
+ppStmtExt :: PrettyExt ext => proxy ext -> StmtExtension ext (Reg ctx) tp -> Doc
+ppStmtExt _ = ppApp pretty
+
+ppStmt :: forall ext ctx ctx'
+        . PrettyExt ext => Size ctx -> Stmt ext ctx ctx' -> Doc
 ppStmt r s =
   case s of
-    SetReg _ e -> ppReg r <+> text "=" <+> pretty e
-    ExtendAssign s' -> ppReg r <+> text "=" <+> ppApp pretty s'
+    SetReg _ e -> ppReg r <+> text "=" <+> ppExpr e
+    ExtendAssign s' -> ppReg r <+> text "=" <+> ppStmtExt (Proxy :: Proxy ext) s'
     CallHandle _ h _ args ->
       ppReg r <+> text "= call"
               <+> pretty h <> parens (commas (ppAssignment args))
